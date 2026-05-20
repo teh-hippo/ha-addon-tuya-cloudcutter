@@ -1,0 +1,25 @@
+name: Tuya Cloudcutter
+version: "0.1.0"
+slug: tuya_cloudcutter
+description: HAOS add-on wrapping tuya-cloudcutter. Pioneer/PoC; for one-off Tuya WiFi-chip exploitation.
+arch:
+  - aarch64
+url: https://github.com/teh-hippo/ha-addon-tuya-cloudcutter
+init: false
+startup: application
+boot: manual
+host_network: true
+host_dbus: true
+apparmor: false
+privileged:
+  - NET_ADMIN
+  - NET_RAW
+  - SYS_ADMIN
+map:
+  - share:rw
+  - addon_config:rw
+ingress: true
+ingress_port: 7681
+panel_icon: mdi:content-cut
+options: {}
+schema: {}
