@@ -8,24 +8,37 @@ RUN apt-get -qq update && apt-get install -qy --no-install-recommends \
       network-manager ca-certificates curl bash procps \
  && rm -rf /var/lib/apt/lists/*
 
-# Install ttyd static aarch64 binary (Bullseye lacks an apt package)
+# Install ttyd static aarch64 binary (Bullseye lacks an apt package).
+# SHA256 verified against https://github.com/tsl0922/ttyd/releases/download/1.7.7/SHA256SUMS
 ARG TTYD_VERSION=1.7.7
+ARG TTYD_SHA256=b38acadd89d1d396a0f5649aa52c539edbad07f4bc7348b27b4f4b7219dd4165
 RUN curl -fsSL -o /usr/local/bin/ttyd \
       "https://github.com/tsl0922/ttyd/releases/download/${TTYD_VERSION}/ttyd.aarch64" \
+ && echo "${TTYD_SHA256}  /usr/local/bin/ttyd" | sha256sum -c - \
  && chmod +x /usr/local/bin/ttyd \
  && /usr/local/bin/ttyd --version
 
-ARG CLOUDCUTTER_REV=main
-RUN git clone https://github.com/tuya-cloudcutter/tuya-cloudcutter /opt/cloudcutter \
- && cd /opt/cloudcutter && git checkout "${CLOUDCUTTER_REV}"
+# Pin to a specific SHA. Use git-init + fetch-by-SHA so we get exact pinning while
+# still benefiting from --depth 1 (no full history). Update SHA when intentionally
+# bumping; CI/build is otherwise reproducible.
+ARG CLOUDCUTTER_REV=7bd6b8b1b0c08d3b7a0929e2bb87dd2a649d7c73
+RUN git init /opt/cloudcutter \
+ && cd /opt/cloudcutter \
+ && git remote add origin https://github.com/tuya-cloudcutter/tuya-cloudcutter \
+ && git fetch --depth 1 origin "${CLOUDCUTTER_REV}" \
+ && git checkout FETCH_HEAD
 
 # Device profiles + device descriptors live in a separate repo (tuya-cloudcutter.github.io).
-# Sparse-checkout so we skip the ~133MB images/ dir.
-ARG DEVICE_PROFILES_REV=master
-RUN git clone --depth 1 --filter=blob:none --sparse \
-      https://github.com/tuya-cloudcutter/tuya-cloudcutter.github.io /tmp/profiles-repo \
+# Sparse-checkout so we skip the ~133MB images/ dir. SHA-pinned via fetch-by-SHA.
+ARG DEVICE_PROFILES_REV=7af966ad3fc57b0bcb3318c2cac19d1d746ab454
+RUN git init /tmp/profiles-repo \
  && cd /tmp/profiles-repo \
+ && git remote add origin https://github.com/tuya-cloudcutter/tuya-cloudcutter.github.io \
+ && git config core.sparseCheckout true \
+ && git sparse-checkout init --no-cone \
  && git sparse-checkout set profiles devices \
+ && git fetch --depth 1 --filter=blob:none origin "${DEVICE_PROFILES_REV}" \
+ && git checkout FETCH_HEAD \
  && cp -r profiles devices /opt/cloudcutter/device-profiles/ \
  && rm -rf /tmp/profiles-repo \
  && echo "device-profiles populated:" \

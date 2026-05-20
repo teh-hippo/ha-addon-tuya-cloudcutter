@@ -72,9 +72,11 @@ trap 'cleanup; exit 0' INT TERM
 # Set wlan0 unmanaged so we can grab it later
 nmcli device set "$WLAN" managed no 2>/dev/null || echo "warn: could not set $WLAN unmanaged"
 
-# ttyd as child (NOT exec) so the trap fires on shutdown
+# ttyd as child (NOT exec) so the trap fires on shutdown.
+# Capture PID immediately into a shell variable; pidfile is for introspection only.
 ttyd -W -p 7681 -t titleFixed=Cloudcutter -t fontSize=14 \
   bash -lc 'cd /opt/cloudcutter && exec bash' &
-echo $! > /tmp/cc-ttyd.pid
-echo "[cloudcutter-addon] ttyd up on :7681 (ingress)"
-wait "$(cat /tmp/cc-ttyd.pid)"
+TTYD_PID=$!
+echo "$TTYD_PID" > /tmp/cc-ttyd.pid
+echo "[cloudcutter-addon] ttyd up on :7681 (ingress, pid=$TTYD_PID)"
+wait "$TTYD_PID"

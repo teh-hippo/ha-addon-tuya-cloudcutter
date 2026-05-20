@@ -16,7 +16,7 @@ Wraps [tuya-cloudcutter](https://github.com/tuya-cloudcutter/tuya-cloudcutter) f
 2. Install the "Tuya Cloudcutter" add-on
 3. Open the Web UI (ingress)
 4. Run `python3 /opt/cloudcutter/cc-wrap.py status` to verify
-5. Flash a device: see DOCS.md
+5. Flash a device: run `python3 /opt/cloudcutter/cc-wrap.py --help` inside the ingress shell for current subcommands (the `flash` flow lands in Phase A).
 
 ## Credit
 
