@@ -54,9 +54,13 @@ RUN ln -s /opt/cloudcutter /work
 
 WORKDIR /opt/cloudcutter
 
+# Persist generated keys to /share/ so they survive addon updates/rebuilds.
+# Upstream cloudcutter writes to ./configured-devices (relative); we point that
+# at the bind-mounted /share path. The directory is created at run time if missing.
+RUN ln -sfn /share/cloudcutter-configured-devices /opt/cloudcutter/configured-devices
+
 COPY run.sh /run.sh
-COPY cc-wrap.py /opt/cloudcutter/cc-wrap.py
-RUN chmod +x /run.sh /opt/cloudcutter/cc-wrap.py
+RUN chmod +x /run.sh
 
 ARG BUILD_VERSION
 ARG BUILD_ARCH

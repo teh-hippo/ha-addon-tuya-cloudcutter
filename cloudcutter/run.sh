@@ -37,12 +37,14 @@ cd /opt/cloudcutter/src && pipenv run python3 -m cloudcutter --help 2>&1 | head 
 cd /opt/cloudcutter
 
 echo
-echo "[cloudcutter-addon] === diag: cc-wrap.py status ==="
-python3 /opt/cloudcutter/cc-wrap.py status 2>&1 | sed 's/^/  /'
-
-echo
-echo "[cloudcutter-addon] === diag: cc-wrap.py list-profiles --filter bk7231t (head) ==="
-python3 /opt/cloudcutter/cc-wrap.py list-profiles --filter bk7231t 2>&1 | head -10 | sed 's/^/  /'
+echo "[cloudcutter-addon] === diag: configured-devices output dir ==="
+mkdir -p /share/cloudcutter-configured-devices 2>/dev/null || true
+if [[ -L /opt/cloudcutter/configured-devices ]]; then
+  TARGET=$(readlink -f /opt/cloudcutter/configured-devices)
+  echo "  ok: /opt/cloudcutter/configured-devices -> $TARGET"
+else
+  echo "  WARN: /opt/cloudcutter/configured-devices is not a symlink (upstream output won't persist)"
+fi
 
 echo
 echo "[cloudcutter-addon] === diag end ==="

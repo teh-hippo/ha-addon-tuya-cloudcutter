@@ -2,21 +2,17 @@
 
 ⚠️ **Pioneer status**: first community attempt at wrapping `tuya-cloudcutter` as a HAOS add-on. Use at your own risk.
 
-⚠️ **Highly privileged**: requires `host_network`, `host_dbus`, `apparmor: false`, and `NET_ADMIN + NET_RAW + SYS_ADMIN` capabilities. Effectively root on the host network stack.
+⚠️ **Highly privileged**: requires `host_network`, `host_dbus`, `apparmor: false`, and `NET_ADMIN + NET_RAW + SYS_ADMIN`. Effectively root on the host network stack.
 
-⚠️ **Only run manually**, stop when done. Requires a HA installation on **wired Ethernet** — the add-on takes over `wlan0`.
+⚠️ **Only run manually**, stop when done. Requires HA on **wired Ethernet** — the add-on takes over `wlan0`.
 
-## What it does
+## What it is
 
-Wraps [tuya-cloudcutter](https://github.com/tuya-cloudcutter/tuya-cloudcutter) for HAOS hosts. Lets you exploit Tuya WiFi modules (BK7231T/N, RTL87xx) over-the-air to flash ESPHome / OpenBeken without soldering.
+A HAOS-compatible environment for [tuya-cloudcutter](https://github.com/tuya-cloudcutter/tuya-cloudcutter): same Python module, same flow, **no convenience layer**. You invoke the upstream commands directly from the add-on's web terminal (or via `docker exec`).
 
-## How to use
+## Using it
 
-1. Install via HA Add-on Store → Repositories → add `https://github.com/teh-hippo/ha-addon-tuya-cloudcutter`
-2. Install the "Tuya Cloudcutter" add-on
-3. Open the Web UI (ingress)
-4. Run `python3 /opt/cloudcutter/cc-wrap.py status` to verify
-5. Flash a device: run `python3 /opt/cloudcutter/cc-wrap.py --help` inside the ingress shell for current subcommands (the `flash` flow lands in Phase A).
+Open the Documentation tab inside Home Assistant for the cut and flash sequences, or run `cat /opt/cloudcutter/DOCS.md` from the add-on's web terminal. Both transcribe the upstream [INSTRUCTIONS.md](https://github.com/tuya-cloudcutter/tuya-cloudcutter/blob/main/INSTRUCTIONS.md) with HAOS-specific path adjustments.
 
 ## Credit
 
