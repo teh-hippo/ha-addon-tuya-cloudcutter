@@ -8,7 +8,8 @@
 
 ## Changelog
 
-- **v0.3.1**: Container can now access `/dev/rfkill` for AP-mode bring-up. Patched upstream `setup_apmode.sh` to fix the hostapd channel bug on multi-band radios (e.g. Pi CYW43455) — defaults to 2.4 GHz channel 6 unless `AP_CHANNEL` is pre-exported (e.g. `AP_CHANNEL=1 bash setup_apmode.sh wlan0 true`). Supervisor `state:` now stays `stopped` (not `error`) after a clean addon stop, while real ttyd crashes still surface as `state:error`.
+- **v0.3.2**: Replaced the v0.3.1 partial signal-aware exit (which still produced `state:error` because `wait` returned 143 before the EXIT trap could set the flag) with explicit `TERM`/`INT` traps that exit 0 directly. Clean stop now reliably shows `state:stopped` in Home Assistant; real ttyd crashes still surface as `state:error`.
+- **v0.3.1**: Container can now access `/dev/rfkill` for AP-mode bring-up. Patched upstream `setup_apmode.sh` to fix the hostapd channel bug on multi-band radios (e.g. Pi CYW43455) — defaults to 2.4 GHz channel 6 unless `AP_CHANNEL` is pre-exported (e.g. `AP_CHANNEL=1 bash setup_apmode.sh wlan0 true`).
 - **v0.3.0**: Optional sshd (off by default; pubkey only) for scripted / agent-driven workflows. See "SSH diagnostics" below.
 - **v0.2.0**: Barebones cleanup; trap-based wlan0 / pidfile management. Schema dir + configured-devices symlink stabilised.
 

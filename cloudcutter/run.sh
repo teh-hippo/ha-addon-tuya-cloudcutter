@@ -2,13 +2,11 @@
 set -uo pipefail
 
 WLAN="${WLAN:-wlan0}"
-TERMINATING=0
 
 # Ensure /share output dir exists for cloudcutter's symlinked configured-devices.
 mkdir -p /share/cloudcutter-configured-devices
 
 cleanup() {
-  TERMINATING=1
   echo "[cloudcutter-addon] === cleanup ==="
   # setup_apmode.sh writes its pidfiles to $(pwd) when launched from /opt/cloudcutter/src.
   for pidfile in /opt/cloudcutter/src/hostapd.pid /opt/cloudcutter/src/dnsmasq.pid /tmp/cc-sshd.pid /tmp/cc-ttyd.pid; do
@@ -23,7 +21,12 @@ cleanup() {
   nmcli device set "$WLAN" managed yes 2>/dev/null || true
   echo "[cloudcutter-addon] cleanup done"
 }
+on_signal() {
+  echo "[cloudcutter-addon] received signal; exiting cleanly"
+  exit 0
+}
 trap cleanup EXIT
+trap on_signal TERM INT
 
 # Release wlan0 from NetworkManager so hostapd / setup_apmode.sh can claim it later.
 nmcli device set "$WLAN" managed no 2>/dev/null || echo "warn: could not set $WLAN unmanaged"
@@ -75,13 +78,9 @@ echo "$TTYD_PID" > /tmp/cc-ttyd.pid
 echo "[cloudcutter-addon] ttyd up on :7681 (ingress, pid=$TTYD_PID)"
 
 # Signal-aware exit:
-# - supervisor SIGTERM/SIGINT to PID 1 fires the trap (TERMINATING=1) and then
-#   `wait` returns 143 or 130 → exit 0 so HA UI shows state:stopped not error.
-# - if ttyd itself crashes (TERMINATING still 0, rc != 143/130) we let the
-#   non-zero rc propagate so the failure surfaces.
-wait "$TTYD_PID" 2>/dev/null
-rc=$?
-if [[ "$TERMINATING" == "1" ]] || [[ "$rc" == "143" ]] || [[ "$rc" == "130" ]]; then
-  exit 0
-fi
-exit "$rc"
+# - supervisor SIGTERM/SIGINT to PID 1 triggers on_signal (exit 0) BEFORE
+#   `wait` resumes, so HA UI shows state:stopped not error.
+# - if ttyd itself crashes (no signal), `wait` returns ttyd's exit code; we
+#   propagate it so the failure surfaces in HA UI as state:error.
+wait "$TTYD_PID"
+exit $?
