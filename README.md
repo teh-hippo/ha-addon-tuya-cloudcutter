@@ -6,14 +6,16 @@ as a Home Assistant OS add-on. Use at your own risk.
 
 ## Who it's for
 
-Semi-manual: a human operator at the add-on's ingress web terminal, or an
-agent driving it via `ssh root@haos 'docker exec addon_<slug> ...'`. The
-add-on provides a HAOS-compatible environment for the upstream
-`tuya-cloudcutter` Python module, plus minimal `wlan0` lifecycle handling.
-**There is no convenience layer** — operators invoke the upstream commands
-directly. The add-on's README documents only the HAOS-specific deltas
-(container paths, ttyd entry point, wlan0 ownership, recovery); for the
-canonical cut / flash workflow see upstream
+Semi-manual: a human operator at the add-on's ingress web terminal, or
+an agent driving it via the add-on's optional sshd on a dedicated port
+(see the add-on README's *SSH diagnostics* section). The add-on
+provides a HAOS-compatible environment for the upstream
+`tuya-cloudcutter` Python module, plus minimal `wlan0` lifecycle
+handling. **There is no convenience layer** — operators invoke the
+upstream commands directly. The add-on's README documents only the
+HAOS-specific deltas (container paths, entry points, ESPHome firmware
+staging, wlan0 ownership, recovery); for the canonical cut / flash
+workflow see upstream
 [INSTRUCTIONS.md](https://github.com/tuya-cloudcutter/tuya-cloudcutter/blob/main/INSTRUCTIONS.md).
 
 ## Installation
