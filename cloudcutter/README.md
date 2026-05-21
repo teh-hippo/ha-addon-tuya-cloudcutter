@@ -33,7 +33,35 @@ The upstream docs assume a Linux host you SSH into; this add-on is the container
 ## Entry points
 
 - **Web terminal (ingress)**: HA → Add-ons → Tuya Cloudcutter → "Open Web UI". Drops you in `/opt/cloudcutter/` with a login shell. This is the supported operator surface.
-- **Shell-from-SSH** (alternative): from the Terminal & SSH add-on, `docker exec -it addon_$(docker ps --format '{{.Names}}' | grep tuya_cloudcutter) bash`.
+- **Optional sshd** (for scripted / agent-driven workflows): see below.
+- **Shell-from-SSH** (only works on hosts with Docker socket exposed to a Terminal add-on, e.g. Advanced SSH & Web Terminal with Protection mode off): `docker exec -it addon_$(docker ps --format '{{.Names}}' | grep tuya_cloudcutter) bash`.
+
+## SSH diagnostics (optional)
+
+The add-on can run its own sshd on the HAOS host network (because of `host_network: true`). This is **off by default** and only starts when you provide at least one authorised public key.
+
+Configure under the add-on's **Configuration** tab:
+
+```yaml
+ssh_authorized_keys:
+  - ssh-ed25519 AAAA... user@host
+ssh_port: 22251
+```
+
+Then connect from any LAN host:
+
+```bash
+ssh -p 22251 root@<HAOS_IP>
+```
+
+You'll land inside the cloudcutter container at `/opt/cloudcutter/` as root.
+
+Notes:
+
+- Pubkey-only auth (`PasswordAuthentication no`, `PermitRootLogin prohibit-password`). Mirrors the official `core_ssh` posture.
+- Host keys generated on first start and persisted in `/data/ssh_host_keys/` so they survive add-on upgrades.
+- Leave `ssh_authorized_keys: []` to disable sshd entirely (zero attack surface).
+- The default port `22251` is arbitrary; change it if it collides with anything else bound on the HAOS host.
 
 ## wlan0 lifecycle
 

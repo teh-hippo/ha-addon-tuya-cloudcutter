@@ -4,8 +4,8 @@ FROM ${BUILD_FROM}
 # Match upstream cloudcutter deps + add full networkmanager, curl
 # (ttyd is not in Bullseye apt; installed as static binary below)
 RUN apt-get -qq update && apt-get install -qy --no-install-recommends \
-      git hostapd rfkill dnsmasq build-essential libssl-dev iproute2 mosquitto iw \
-      network-manager ca-certificates curl bash procps \
+      git hostapd rfkill dnsmasq build-essential libssl-dev iproute2 jq mosquitto iw \
+      network-manager openssh-server ca-certificates curl bash procps \
  && rm -rf /var/lib/apt/lists/*
 
 # Install ttyd static aarch64 binary (Bullseye lacks an apt package).

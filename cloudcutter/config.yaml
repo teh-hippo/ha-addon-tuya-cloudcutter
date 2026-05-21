@@ -1,5 +1,5 @@
 name: Tuya Cloudcutter
-version: "0.2.0"
+version: "0.3.0"
 slug: tuya_cloudcutter
 description: HAOS wrapper for tuya-cloudcutter. Cut Tuya devices from the cloud or flash custom firmware over-the-air. Upstream-native, no convenience layer.
 arch:
@@ -20,5 +20,10 @@ map:
 ingress: true
 ingress_port: 7681
 panel_icon: mdi:content-cut
-options: {}
-schema: {}
+options:
+  ssh_authorized_keys: []
+  ssh_port: 22251
+schema:
+  ssh_authorized_keys:
+    - str
+  ssh_port: port
