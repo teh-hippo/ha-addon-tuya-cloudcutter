@@ -28,6 +28,18 @@ RUN git init /opt/cloudcutter \
  && git fetch --depth 1 origin "${CLOUDCUTTER_REV}" \
  && git checkout FETCH_HEAD
 
+# Patch upstream setup_apmode.sh to fix the hostapd channel selection bug:
+# upstream reads `iw dev wlan0 info` to pick a channel, which on multi-band
+# radios returns the currently-tuned channel (often 5 GHz). But hostapd is
+# configured for hw_mode=g (2.4 GHz only), so a 5 GHz value causes AP-DISABLED.
+# We replace the assignment with an operator-overridable default of channel 6.
+# Pre/post `grep -qx` guards fail the build LOUDLY if upstream changes the
+# line, so we never silently no-op a patch.
+RUN cd /opt/cloudcutter \
+ && grep -qx 'AP_CHANNEL=$(get_ap_channel "$WLAN")' src/setup_apmode.sh \
+ && sed -i 's|^AP_CHANNEL=\$(get_ap_channel "\$WLAN")$|AP_CHANNEL="${AP_CHANNEL:-6}"|' src/setup_apmode.sh \
+ && grep -qx 'AP_CHANNEL="${AP_CHANNEL:-6}"' src/setup_apmode.sh
+
 # Device profiles + device descriptors live in a separate repo (tuya-cloudcutter.github.io).
 # Sparse-checkout so we skip the ~133MB images/ dir. SHA-pinned via fetch-by-SHA.
 ARG DEVICE_PROFILES_REV=7af966ad3fc57b0bcb3318c2cac19d1d746ab454

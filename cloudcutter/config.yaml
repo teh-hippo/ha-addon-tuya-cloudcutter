@@ -1,5 +1,5 @@
 name: Tuya Cloudcutter
-version: "0.3.0"
+version: "0.3.1"
 slug: tuya_cloudcutter
 description: HAOS wrapper for tuya-cloudcutter. Cut Tuya devices from the cloud or flash custom firmware over-the-air. Upstream-native, no convenience layer.
 arch:
@@ -15,6 +15,11 @@ privileged:
   - NET_ADMIN
   - NET_RAW
   - SYS_ADMIN
+# /dev/rfkill needed inside container for setup_apmode.sh's `rfkill unblock wifi`.
+# If this still gives "Operation not permitted" on some kernels, escalate to
+# `udev: true` (alongside, not instead) — or drop `:rwm` if Supervisor rejects.
+devices:
+  - /dev/rfkill:rwm
 map:
   - share:rw
 ingress: true

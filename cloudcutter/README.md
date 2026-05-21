@@ -2,9 +2,15 @@
 
 ⚠️ **Pioneer status**: first community attempt at wrapping `tuya-cloudcutter` as a HAOS add-on. Use at your own risk.
 
-⚠️ **Highly privileged**: requires `host_network`, `host_dbus`, `apparmor: false`, and `NET_ADMIN + NET_RAW + SYS_ADMIN`. Effectively root on the host network stack.
+⚠️ **Highly privileged**: requires `host_network`, `host_dbus`, `apparmor: false`, `/dev/rfkill` device passthrough, and `NET_ADMIN + NET_RAW + SYS_ADMIN`. Effectively root on the host network stack.
 
 ⚠️ **Only run manually**, stop when done. Requires HA on **wired Ethernet** — the add-on takes over `wlan0`.
+
+## Changelog
+
+- **v0.3.1**: Container can now access `/dev/rfkill` for AP-mode bring-up. Patched upstream `setup_apmode.sh` to fix the hostapd channel bug on multi-band radios (e.g. Pi CYW43455) — defaults to 2.4 GHz channel 6 unless `AP_CHANNEL` is pre-exported (e.g. `AP_CHANNEL=1 bash setup_apmode.sh wlan0 true`). Supervisor `state:` now stays `stopped` (not `error`) after a clean addon stop, while real ttyd crashes still surface as `state:error`.
+- **v0.3.0**: Optional sshd (off by default; pubkey only) for scripted / agent-driven workflows. See "SSH diagnostics" below.
+- **v0.2.0**: Barebones cleanup; trap-based wlan0 / pidfile management. Schema dir + configured-devices symlink stabilised.
 
 ## What it is
 
@@ -28,7 +34,7 @@ The upstream docs assume a Linux host you SSH into; this add-on is the container
 | `./custom-firmware/` | `/share/cloudcutter-firmware/` (drop your `.bin` here) |
 | `./configured-devices/` | `/opt/cloudcutter/configured-devices/` (symlinked to `/share/cloudcutter-configured-devices/` so generated `.deviceconfig` files survive add-on updates) |
 | `./` (CWD) | `/opt/cloudcutter/src/` (symlinked as `/work/` for upstream defaults that assume that) |
-| `pipenv run python -m cloudcutter …` | same; run from `/opt/cloudcutter/src/` |
+| `pipenv run python -m cloudcutter …` | same; **must run from `/opt/cloudcutter/src/`** (Pipfile lives there; cd'ing to `/opt/cloudcutter/` causes pipenv to silently create a new empty venv) |
 
 ## Entry points
 
