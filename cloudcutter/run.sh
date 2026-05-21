@@ -6,18 +6,12 @@ WLAN="${WLAN:-wlan0}"
 # Ensure /share output dir exists for cloudcutter's symlinked configured-devices.
 mkdir -p /share/cloudcutter-configured-devices
 
-# Expose /share/cloudcutter-firmware/* into the path cloudcutter hard-codes
-# for OTA serving (/work/custom-firmware -> /opt/cloudcutter/custom-firmware).
-# Idempotent: ln -sf overwrites stale symlinks but won't recreate identical ones.
-# Upstream-shipped kickstart binaries in /opt/cloudcutter/custom-firmware are
-# only displaced if a user explicitly stages a file with the same basename.
-mkdir -p /share/cloudcutter-firmware /opt/cloudcutter/custom-firmware
-shopt -s nullglob
-for f in /share/cloudcutter-firmware/*; do
-  [[ -f "$f" ]] || continue
-  ln -sf "$f" "/opt/cloudcutter/custom-firmware/$(basename "$f")"
-done
-shopt -u nullglob
+# Stage custom firmware into the path cloudcutter hard-codes for OTA serving
+# (/work/custom-firmware -> /opt/cloudcutter/custom-firmware). Picks up both
+# operator-staged /share/cloudcutter-firmware/ AND auto-discovered ESPHome
+# dashboard build artefacts. See script header for precedence + extension
+# support details. Re-runnable on demand after compiling in the dashboard.
+/usr/local/bin/cc-stage-firmware
 
 cleanup() {
   echo "[cloudcutter-addon] === cleanup ==="

@@ -76,7 +76,8 @@ RUN rm -rf /opt/cloudcutter/configured-devices \
  && ln -sfn /share/cloudcutter-configured-devices /opt/cloudcutter/configured-devices
 
 COPY run.sh /run.sh
-RUN chmod +x /run.sh
+COPY cc-stage-firmware /usr/local/bin/cc-stage-firmware
+RUN chmod +x /run.sh /usr/local/bin/cc-stage-firmware
 
 ARG BUILD_VERSION
 ARG BUILD_ARCH

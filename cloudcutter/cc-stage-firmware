@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# cc-stage-firmware — idempotently rebuild /opt/cloudcutter/custom-firmware/
+# symlinks from two managed sources:
+#
+#   1. /config/esphome/.esphome/build/<device>/.pioenvs/<env>/image_<chip>_app.<ext>
+#      (auto-pickup from the ESPHome HA add-on dashboard, requires the
+#      matching /config/esphome/<device>.yaml to exist — orphan build dirs
+#      are skipped to avoid flashing stale firmware after a yaml is deleted.)
+#
+#   2. /share/cloudcutter-firmware/<basename>
+#      (explicit operator-staged firmware. Higher priority — overrides Pass 1
+#      on basename collision so a hand-placed binary always wins over an
+#      auto-discovered dashboard build.)
+#
+# Stale symlinks pointing into either managed dir whose target no longer
+# exists are removed. Upstream-shipped kickstart binaries (regular files in
+# /opt/cloudcutter/custom-firmware/, not symlinks) are never touched.
+#
+# Supported firmware extensions: ota.ug.bin (BK7231T), ug.bin (BK7231N),
+# img (RTL871x family). New extensions: extend the EXTENSIONS list below.
+#
+# Re-run on demand after compiling in the ESPHome dashboard:
+#     bash /usr/local/bin/cc-stage-firmware
+# Or restart the addon (run.sh invokes this on startup).
+
+set -uo pipefail
+
+CC_DIR=/opt/cloudcutter/custom-firmware
+SHARE_DIR=/share/cloudcutter-firmware
+ESPHOME_BUILD_DIR=/config/esphome/.esphome/build
+
+mkdir -p "$CC_DIR" "$SHARE_DIR"
+
+log() { echo "[cc-stage-firmware] $*"; }
+
+# Step 1 — Clean stale symlinks (managed targets only).
+shopt -s nullglob
+for link in "$CC_DIR"/*; do
+  [[ -L "$link" ]] || continue
+  target=$(readlink "$link")
+  case "$target" in
+    "$SHARE_DIR"/*|"$ESPHOME_BUILD_DIR"/*)
+      if [[ ! -e "$target" ]]; then
+        rm -f "$link"
+        log "cleaned stale: $(basename "$link") -> $target"
+      fi
+      ;;
+  esac
+done
+shopt -u nullglob
+
+# Step 2 — ESPHome dashboard build pickup (lower priority — /share/ wins).
+# Use exact image_<chip>_app.<ext> patterns to avoid matching elf/map/etc.
+# Defensive guard on .ug.bin to exclude .ota.ug.bin double-matches.
+if [[ -d "$ESPHOME_BUILD_DIR" ]]; then
+  shopt -s nullglob
+  for build_dir in "$ESPHOME_BUILD_DIR"/*/; do
+    device=$(basename "$build_dir")
+    # Orphan check: only pick up builds with matching yaml in /config/esphome/.
+    [[ -f "/config/esphome/${device}.yaml" ]] || {
+      log "skipped orphan: no /config/esphome/${device}.yaml"
+      continue
+    }
+    for env_dir in "${build_dir}.pioenvs/"*/; do
+      [[ -d "$env_dir" ]] || continue
+      for ext in ota.ug.bin ug.bin img; do
+        for bin in "${env_dir}image_"*"_app.${ext}"; do
+          [[ -f "$bin" ]] || continue
+          # Skip if .ug.bin glob accidentally matched .ota.ug.bin.
+          if [[ "$ext" == "ug.bin" && "$bin" == *.ota.ug.bin ]]; then
+            continue
+          fi
+          target="$CC_DIR/${device}.${ext}"
+          ln -sf "$bin" "$target"
+          log "esphome -> ${device}.${ext}: $bin"
+        done
+      done
+    done
+  done
+  shopt -u nullglob
+else
+  log "no ESPHome build dir at $ESPHOME_BUILD_DIR (dashboard never compiled?)"
+fi
+
+# Step 3 — Operator-staged /share/cloudcutter-firmware/ (higher priority).
+# ln -sf overwrites Pass 2 symlinks on basename collision.
+shopt -s nullglob
+for f in "$SHARE_DIR"/*; do
+  [[ -f "$f" ]] || continue
+  basename=$(basename "$f")
+  target="$CC_DIR/${basename}"
+  # Notice precedence override so operators see why their /share/ won.
+  if [[ -L "$target" ]]; then
+    cur=$(readlink "$target")
+    if [[ "$cur" == "$ESPHOME_BUILD_DIR"/* ]]; then
+      log "/share overrides esphome build for ${basename}"
+    fi
+  fi
+  ln -sf "$f" "$target"
+  log "share -> ${basename}: $f"
+done
+shopt -u nullglob
+
+log "done. current symlinks:"
+ls -la "$CC_DIR"/ 2>/dev/null | awk '$1 ~ /^l/ {print "  " $NF, "->", $(NF-2)}'

@@ -1,5 +1,5 @@
 name: Tuya Cloudcutter
-version: "0.3.3"
+version: "0.3.4"
 slug: tuya_cloudcutter
 description: HAOS wrapper for tuya-cloudcutter. Cut Tuya devices from the cloud or flash custom firmware over-the-air. Upstream-native, no convenience layer.
 arch:
@@ -22,6 +22,15 @@ devices:
   - /dev/rfkill:rwm
 map:
   - share:rw
+  # SECURITY NOTE: config:ro mounts the entire HA /config tree (including
+  # secrets.yaml and .storage/) read-only into this container so the addon
+  # can auto-pick up ESPHome dashboard build artefacts from
+  # /config/esphome/.esphome/build/. Cloudcutter itself never reads /config;
+  # only the cc-stage-firmware helper does (a deterministic glob, no
+  # introspection). If you don't want /config exposed to this container,
+  # remove this line — operator-staged /share/cloudcutter-firmware/ still
+  # works as before.
+  - config:ro
 ingress: true
 ingress_port: 7681
 panel_icon: mdi:content-cut
