@@ -11,7 +11,10 @@ agent driving it via `ssh root@haos 'docker exec addon_<slug> ...'`. The
 add-on provides a HAOS-compatible environment for the upstream
 `tuya-cloudcutter` Python module, plus minimal `wlan0` lifecycle handling.
 **There is no convenience layer** — operators invoke the upstream commands
-directly. See the add-on's Documentation tab once installed.
+directly. The add-on's README documents only the HAOS-specific deltas
+(container paths, ttyd entry point, wlan0 ownership, recovery); for the
+canonical cut / flash workflow see upstream
+[INSTRUCTIONS.md](https://github.com/tuya-cloudcutter/tuya-cloudcutter/blob/main/INSTRUCTIONS.md).
 
 ## Installation
 

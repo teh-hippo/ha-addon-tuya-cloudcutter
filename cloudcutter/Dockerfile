@@ -40,6 +40,7 @@ RUN git init /tmp/profiles-repo \
  && git fetch --depth 1 --filter=blob:none origin "${DEVICE_PROFILES_REV}" \
  && git checkout FETCH_HEAD \
  && cp -r profiles devices /opt/cloudcutter/device-profiles/ \
+ && mkdir -p /opt/cloudcutter/device-profiles/schema \
  && rm -rf /tmp/profiles-repo \
  && echo "device-profiles populated:" \
  && ls /opt/cloudcutter/device-profiles/profiles | wc -l && echo "profiles" \
