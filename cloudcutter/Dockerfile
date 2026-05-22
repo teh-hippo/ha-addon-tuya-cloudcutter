@@ -40,6 +40,29 @@ RUN cd /opt/cloudcutter \
  && sed -i 's|^AP_CHANNEL=\$(get_ap_channel "\$WLAN")$|AP_CHANNEL="${AP_CHANNEL:-6}"|' src/setup_apmode.sh \
  && grep -qx 'AP_CHANNEL="${AP_CHANNEL:-6}"' src/setup_apmode.sh
 
+# Apply additional upstream patches (see cloudcutter/patches/README.md):
+#   001: bind tornado HTTP/HTTPS servers to args.ip instead of wildcard 0.0.0.0
+#        (fixes port 80/443/4433 collisions with other host-network addons,
+#        most notably core_nginx_proxy holding :443 for HA's SSL UI).
+#   002: setup_apmode.sh — idempotent mkdir + dedicated mosquitto conf.d
+#        file instead of appending to mosquitto.conf on every run.
+# `git apply --check` fails the build LOUDLY if upstream drifts, so the
+# patches never silently no-op. Refresh procedure documented in
+# cloudcutter/patches/README.md.
+COPY patches/ /tmp/cc-patches/
+RUN cd /opt/cloudcutter \
+ && for p in /tmp/cc-patches/*.patch; do \
+      echo "applying $(basename "$p")" \
+      && git apply --check "$p" \
+      && git apply "$p"; \
+    done \
+ && grep -qx '    http_server.listen(80, address=args.ip)' src/cloudcutter/__main__.py \
+ && grep -qx '    https_server.listen(443, address=args.ip)' src/cloudcutter/__main__.py \
+ && grep -qx '    dns_https_server.listen(4433, address=args.ip)' src/cloudcutter/__main__.py \
+ && grep -qx 'mkdir -p /run/mosquitto' src/setup_apmode.sh \
+ && grep -q 'cat > /etc/mosquitto/conf.d/cloudcutter.conf' src/setup_apmode.sh \
+ && rm -rf /tmp/cc-patches
+
 # Device profiles + device descriptors live in a separate repo (tuya-cloudcutter.github.io).
 # Sparse-checkout so we skip the ~133MB images/ dir. SHA-pinned via fetch-by-SHA.
 ARG DEVICE_PROFILES_REV=7af966ad3fc57b0bcb3318c2cac19d1d746ab454
@@ -76,8 +99,8 @@ RUN rm -rf /opt/cloudcutter/configured-devices \
  && ln -sfn /share/cloudcutter-configured-devices /opt/cloudcutter/configured-devices
 
 COPY run.sh /run.sh
-COPY cc-stage-firmware /usr/local/bin/cc-stage-firmware
-RUN chmod +x /run.sh /usr/local/bin/cc-stage-firmware
+COPY cc-stage-firmware cc-port-check cc-setup-apmode /usr/local/bin/
+RUN chmod +x /run.sh /usr/local/bin/cc-stage-firmware /usr/local/bin/cc-port-check /usr/local/bin/cc-setup-apmode
 
 ARG BUILD_VERSION
 ARG BUILD_ARCH

@@ -57,6 +57,16 @@ These are HAOS-specific and not covered in the upstream docs. See `TROUBLESHOOTI
 | BK7231T / `bk72xx:` | ✅ Flashed successfully (Galaxy projector, 2026-05-22) | OTA artefact is `.ota.ug.bin`. Use ESPHome native OTA (`ota: - platform: esphome`) for follow-up firmware updates. |
 | RTL8720CF / `rtl87xx:` | ❓ Not yet validated with this add-on | Upstream cloudcutter port from Nov 2025. OTA artefact is `.ota.bin` (no `.ug` wrapper). Expect TuyaMCU-class quirks on appliance devices. |
 
+## In-image helpers
+
+These ship under `/usr/local/bin/`. All are idempotent and re-runnable from the addon shell.
+
+| Helper | Purpose |
+|---|---|
+| `cc-stage-firmware` | Rebuild `/opt/cloudcutter/custom-firmware/` symlinks from operator-staged firmware in `/share/cloudcutter-firmware/`. Runs on every addon start; rerun on demand after staging new firmware. |
+| `cc-port-check` | Pre-flight check for cloudcutter HTTP/HTTPS port collisions. Exits non-zero if 80, 443, or 4433 are bound by another process — most commonly `core_nginx_proxy` on `:443`. Runs at addon start (warning-only); operators should run it again immediately before `update_firmware`. |
+| `cc-setup-apmode <iface> [verbose]` | Wraps upstream `setup_apmode.sh` with cleanup, interface cycling, and post-state verification (hostapd alive, dnsmasq alive, mosquitto on 1883, AP mode confirmed). Retries once on failure. Returns 0 only when all 5 verifications pass. Strongly preferred over invoking `setup_apmode.sh` directly. |
+
 ## Entry points
 
 - **Web terminal (ingress)**: HA → Add-ons → Tuya Cloudcutter → "Open Web UI". Drops you in `/opt/cloudcutter/` with a login shell.

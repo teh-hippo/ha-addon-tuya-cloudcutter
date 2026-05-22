@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# cc-setup-apmode — wrap upstream setup_apmode.sh with cleanup + retry +
+# real verification of the post-state.
+#
+# Upstream `setup_apmode.sh` occasionally fails its first invocation
+# within a container lifetime due to leftover wiphy / nl80211 / address
+# state (visible as repeated "Match already configured" lines followed
+# by "Interface initialization failed" → "wlan0: AP-DISABLED"). The
+# script returns 0 even when this happens, so silent failures wait until
+# the next operation to surface.
+#
+# This wrapper:
+#   1. cleans up any stale hostapd / dnsmasq / mosquitto processes from
+#      a previous invocation;
+#   2. flushes IP addresses + cycles the interface;
+#   3. runs upstream setup_apmode.sh;
+#   4. verifies hostapd is alive, dnsmasq is alive, mosquitto is on
+#      :1883, the interface has 10.204.0.1/24, and wlan0 type=AP;
+#   5. retries the cycle+upstream-script step once if verification fails.
+#
+# Usage:
+#     cc-setup-apmode [wlan0] [verbose]
+#
+# Returns 0 only when all 5 verifications pass. Non-zero otherwise —
+# `update_firmware` would fail; do not proceed.
+
+set -uo pipefail
+
+WLAN="${1:-wlan0}"
+VERBOSE="${2:-false}"
+
+log() { echo "[cc-setup-apmode] $*"; }
+err() { echo "[cc-setup-apmode] $*" >&2; }
+
+cleanup_previous() {
+  # Kill any cloudcutter-spawned daemons from prior invocations (pidfile-
+  # tracked first, then pgrep fallback for mosquitto which doesn't write
+  # a pidfile).
+  for pidfile in /opt/cloudcutter/src/hostapd.pid /opt/cloudcutter/src/dnsmasq.pid; do
+    if [[ -f "$pidfile" ]]; then
+      pid=$(cat "$pidfile" 2>/dev/null || true)
+      if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+        kill -TERM "$pid" 2>/dev/null || true
+      fi
+      rm -f "$pidfile"
+    fi
+  done
+  mosq_pid=$(pgrep -x mosquitto 2>/dev/null | head -n1 || true)
+  if [[ -n "$mosq_pid" ]]; then
+    kill -TERM "$mosq_pid" 2>/dev/null || true
+  fi
+  # Give them a beat to actually exit so their port + IP releases are
+  # visible to the next attempt.
+  sleep 1
+}
+
+cycle_iface() {
+  ip addr flush dev "$WLAN" 2>/dev/null || true
+  ip link set "$WLAN" down 2>/dev/null || true
+  sleep 3
+  ip link set "$WLAN" up 2>/dev/null || true
+  sleep 1
+}
+
+run_upstream() {
+  cd /opt/cloudcutter/src || return 1
+  bash setup_apmode.sh "$WLAN" "$VERBOSE" 2>&1 | tail -40
+}
+
+verify() {
+  local failed=0
+
+  # 1. interface is in AP mode
+  iw_type=$(iw dev "$WLAN" info 2>/dev/null | awk '$1=="type"{print $2; exit}')
+  if [[ "$iw_type" != "AP" ]]; then
+    err "verify FAIL: $WLAN type is '$iw_type' (expected 'AP')"
+    failed=1
+  fi
+
+  # 2. interface has the AP gateway IP
+  if ! ip -4 addr show dev "$WLAN" | grep -q '10\.204\.0\.1/24'; then
+    err "verify FAIL: $WLAN has no 10.204.0.1/24 address"
+    failed=1
+  fi
+
+  # 3. hostapd alive
+  if [[ ! -s /opt/cloudcutter/src/hostapd.pid ]] || ! kill -0 "$(cat /opt/cloudcutter/src/hostapd.pid)" 2>/dev/null; then
+    err "verify FAIL: hostapd is not running"
+    failed=1
+  fi
+
+  # 4. dnsmasq alive
+  if [[ ! -s /opt/cloudcutter/src/dnsmasq.pid ]] || ! kill -0 "$(cat /opt/cloudcutter/src/dnsmasq.pid)" 2>/dev/null; then
+    err "verify FAIL: dnsmasq is not running"
+    failed=1
+  fi
+
+  # 5. mosquitto listening on 1883
+  if ! ss -tlnH "( sport = :1883 )" 2>/dev/null | grep -q ':1883'; then
+    err "verify FAIL: mosquitto is not listening on :1883"
+    failed=1
+  fi
+
+  return $failed
+}
+
+# --- main ---
+
+log "preparing $WLAN (cleanup + cycle) ..."
+cleanup_previous
+nmcli device set "$WLAN" managed no 2>/dev/null || true
+cycle_iface
+
+log "attempt 1: bash setup_apmode.sh $WLAN $VERBOSE"
+run_upstream
+sleep 2
+if verify; then
+  log "AP mode up: $WLAN ($(iw dev "$WLAN" info | grep ssid | awk '{print $2}'), channel $(iw dev "$WLAN" info | awk '$1=="channel"{print $2}'))"
+  exit 0
+fi
+
+err "attempt 1 failed verification; cycling + retrying once"
+cleanup_previous
+cycle_iface
+
+log "attempt 2: bash setup_apmode.sh $WLAN $VERBOSE"
+run_upstream
+sleep 2
+if verify; then
+  log "AP mode up after retry: $WLAN"
+  exit 0
+fi
+
+err "attempt 2 ALSO failed verification — do NOT proceed to update_firmware"
+err "see TROUBLESHOOTING.md → 'setup_apmode.sh fails silently first run'"
+exit 2

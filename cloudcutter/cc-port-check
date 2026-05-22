@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# cc-port-check — pre-flight check for cloudcutter HTTP/HTTPS port collisions.
+#
+# cloudcutter's `update_firmware` and `configure_local_device` commands
+# bind tornado servers to ports 80, 443, and 4433 on the cloudcutter AP
+# gateway IP (default 10.204.0.1). On HAOS, the addon runs in host
+# network mode, so wildcard listeners on those ports from other addons
+# (most commonly `core_nginx_proxy` on :443) prevent cloudcutter from
+# binding even with the listen-address patch applied — the wildcard
+# covers the specific address too.
+#
+# Run this before `update_firmware` or `configure_local_device`. Exits
+# non-zero if any of the three ports are bound by another process.
+#
+#     cc-port-check && pipenv run python -m cloudcutter update_firmware ...
+#
+# Output goes to stdout (pass) / stderr (warn/error), so the script can
+# be used in pipelines without log noise.
+
+set -uo pipefail
+
+PORTS=(80 443 4433)
+holders=()
+ok=true
+
+for port in "${PORTS[@]}"; do
+  # `ss` is in iproute2 (always present in this image).
+  line=$(ss -tlnH "( sport = :${port} )" 2>/dev/null | head -n1 || true)
+  if [[ -n "$line" ]]; then
+    ok=false
+    holders+=("$port: $line")
+  fi
+done
+
+if $ok; then
+  echo "[cc-port-check] all 3 ports (80/443/4433) free — safe to flash"
+  exit 0
+fi
+
+{
+  echo "[cc-port-check] ⚠ at least one cloudcutter port is in use:"
+  printf '  - %s\n' "${holders[@]}"
+  echo ""
+  echo "  Most common HAOS cause: core_nginx_proxy (NGINX SSL proxy addon)"
+  echo "  holding 0.0.0.0:443 for HA's HTTPS UI. To stop it:"
+  echo ""
+  echo "      ssh -p 2222 root@<HAOS_IP> 'ha apps stop core_nginx_proxy'"
+  echo ""
+  echo "  ⚠ Stopping core_nginx_proxy severs remote HTTPS access via your"
+  echo "    public HA URL. Use port 8123 (or the addon's ingress UI) until"
+  echo "    you restart it:"
+  echo ""
+  echo "      ssh -p 2222 root@<HAOS_IP> 'ha apps start core_nginx_proxy'"
+  echo ""
+  echo "  See TROUBLESHOOTING.md → 'Port 80 / 443 / 4433 collisions' for"
+  echo "  context on other potential port holders."
+} >&2
+
+exit 1

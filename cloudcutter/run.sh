@@ -13,6 +13,16 @@ mkdir -p /share/cloudcutter-configured-devices
 # support details. Re-runnable on demand after compiling in the dashboard.
 /usr/local/bin/cc-stage-firmware
 
+# Pre-flight port check — warn loudly if 80/443/4433 are already bound.
+# Most common HAOS culprit is core_nginx_proxy holding :443 for HA's SSL
+# UI. Warning only at addon start; cc-port-check exits non-zero so anyone
+# scripting the addon launch can branch on it. Operators are expected to
+# also run `cc-port-check` themselves immediately before update_firmware
+# (state can change between addon start and the actual flash).
+echo "[cloudcutter-addon] === pre-flight port check ==="
+/usr/local/bin/cc-port-check || true
+echo "[cloudcutter-addon] === end pre-flight ==="
+
 cleanup() {
   echo "[cloudcutter-addon] === cleanup ==="
   # setup_apmode.sh writes its pidfiles to $(pwd) when launched from /opt/cloudcutter/src.
