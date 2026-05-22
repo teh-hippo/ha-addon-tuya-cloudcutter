@@ -34,10 +34,28 @@ The upstream docs assume a Linux host you SSH into; this add-on is the container
 
 For Tuya devices targeted by an existing ESPHome `bk72xx:` / `rtl87xx:` YAML, the flow is:
 
-1. In the **ESPHome Device Builder** add-on, compile the YAML and use the **Install → Manual Download** button to grab `image_<chip>_app.ota.ug.bin`.
-2. `scp` it into HA's `/share/cloudcutter-firmware/<device>.ota.ug.bin`.
+1. In the **ESPHome Device Builder** add-on, compile the YAML and use the **Install → Manual Download** button to grab the OTA artefact (`image_bk7231t_app.ota.ug.bin` for BK7231 chips, `image.ota.bin` for RTL8720CF). Make sure your YAML's `ota:` block declares `- platform: esphome` — bare `ota:` defaults to web_server, which doesn't handle LibreTiny UF2 OTAs reliably and will block your first post-flash update.
+2. `scp` it into HA's `/share/cloudcutter-firmware/<device>.<ext>`.
 3. Start (or restart) this add-on. `cc-stage-firmware` symlinks each `/share/cloudcutter-firmware/*` into `/opt/cloudcutter/custom-firmware/` (the path cloudcutter's OTA server hard-codes). Re-run on demand with `bash /usr/local/bin/cc-stage-firmware`.
-4. Run the upstream cloudcutter flow (`exploit_device` → `configure_wifi` → `update_firmware`) pointing at your staged filename.
+4. Run the upstream cloudcutter flow (`exploit_device` → `configure_wifi` → `update_firmware`) pointing at your staged filename. Treat steps 2–4 of the upstream flow as one atomic sequence — `configure_wifi` is one-shot and the device has a short retry window.
+5. After OTA, HA may not auto-discover the device via zeroconf. Add it manually: Settings → Devices & Services → Add Integration → ESPHome → device IP + port `6053`.
+
+## Known HAOS blockers
+
+These are HAOS-specific and not covered in the upstream docs. See `TROUBLESHOOTING.md` in this directory for commands and context.
+
+- **Stop any add-on binding 80 / 443 / 4433 before `update_firmware`.** Most commonly `core_nginx_proxy` owns `0.0.0.0:443`. Stopping it severs remote HTTPS access until restarted, so use port 8123 directly during the flash.
+- **`exploit_device` requires a *combined* `{slug, device, profile}` JSON.** Bare profile files fail with `KeyError: 'profile'`. Use `pipenv run python -m get_input ... write-profile <slug>` to build it.
+- **`configure_wifi → setup_apmode → update_firmware` must run as one atomic sequence.** The device only retries the temporary SSID for ~60s before reverting.
+- **If `setup_apmode.sh` exits without leaving wlan0 in AP mode, cycle the interface.** `ip link set wlan0 down; sleep 3; ip link set wlan0 up` then retry; verify with `iw dev wlan0 info | grep 'type AP'`.
+- **OTA over weak 2.4 GHz can fail at 90%+ with chunk-ack timeouts.** Retry — the device usually stayed on the previous firmware.
+
+## Tested targets
+
+| Chip | Status | Notes |
+|---|---|---|
+| BK7231T / `bk72xx:` | ✅ Flashed successfully (Galaxy projector, 2026-05-22) | OTA artefact is `.ota.ug.bin`. Use ESPHome native OTA (`ota: - platform: esphome`) for follow-up firmware updates. |
+| RTL8720CF / `rtl87xx:` | ❓ Not yet validated with this add-on | Upstream cloudcutter port from Nov 2025. OTA artefact is `.ota.bin` (no `.ug` wrapper). Expect TuyaMCU-class quirks on appliance devices. |
 
 ## Entry points
 
@@ -97,6 +115,9 @@ No reboot required. If the addon container itself won't stop cleanly:
 ha apps stop d52dc666_tuya_cloudcutter
 nmcli device set wlan0 managed yes
 ```
+
+For everything else (port collisions, exploit_device errors, OTA failures,
+HA adoption gaps, mosquitto.conf bug), see `TROUBLESHOOTING.md`.
 
 ## Credit
 
